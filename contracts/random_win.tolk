@@ -48,18 +48,31 @@ fun onInternalMessage(in: InMessage) {
 
             if (draw.poolSum >= draw.entryAmountLimit) {
                 random.initialize();
-                val winnerIndex = random.range(draw.participantCounter);
 
+                var addrBuilder = beginCell();
+                var indexMap = createEmptyMap<uint32, address>();
                 var entry = draw.participants.findFirst();
-                var i = 0;
-                while (entry.isFound && i < winnerIndex) {
-                    i += 1;
+                var idx: uint32 = 0;
+                while (entry.isFound) {
+                    val addr = entry.getKey();
+                    addrBuilder.storeAddress(addr);
+                    indexMap.set(idx, addr);
+                    idx += 1;
                     entry = draw.participants.iterateNext(entry);
                 }
-                if (!entry.isFound) {
-                    throw ERROR_WINNER_NOT_FOUND;
-                }
-                val winnerAddress = entry.getKey();
+
+                // Mix addresses hash + current seed + current time to derive entropy.
+                val addrHash = addrBuilder.endCell().hash();
+                val entropyCell = beginCell().storeUint(addrHash, 256).storeUint(
+                    random.getSeed(),
+                    256
+                )
+                    .storeInt(blockchain.now(), 64)
+                    .endCell();
+                val entropy = entropyCell.hash();
+
+                val winnerIndex = entropy % draw.participantCounter;
+                val winnerAddress = indexMap.mustGet(winnerIndex);
 
                 val payout = (draw.poolSum * (100 - storage.fee)) / 100;
                 val reply = createMessage({
