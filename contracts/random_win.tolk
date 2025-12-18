@@ -23,7 +23,7 @@ fun onInternalMessage(in: InMessage) {
             var draw = drawResult.loadValue();
 
             // Refund: return remaining incoming value back to sender
-            if (draw.minEntryAmount > in.valueCoins) {
+            if (draw.minEntryAmount > (in.valueCoins - in.originalForwardFee)) {
                 val reply = createMessage({
                     bounce: BounceMode.Only256BitsOfBody,
                     value: 0,
@@ -44,25 +44,35 @@ fun onInternalMessage(in: InMessage) {
                 draw.participants.set(in.senderAddress, in.valueCoins);
             }
 
-            draw.poolSum += in.valueCoins;
+            draw.poolSum += in.valueCoins - in.originalForwardFee;
 
             if (draw.poolSum >= draw.entryAmountLimit) {
                 random.initialize();
 
-                var addrBuilder = beginCell();
+                var addrChain = beginCell().endCell();
+                var hasAddr = false;
                 var indexMap = createEmptyMap<uint32, address>();
                 var entry = draw.participants.findFirst();
                 var idx: uint32 = 0;
                 while (entry.isFound) {
                     val addr = entry.getKey();
-                    addrBuilder.storeAddress(addr);
+                    var itemBuilder = beginCell();
+                    itemBuilder.storeAddress(addr);
+                    if (hasAddr) {
+                        itemBuilder.storeRef(addrChain);
+                    }
+                    addrChain = itemBuilder.endCell();
+                    hasAddr = true;
                     indexMap.set(idx, addr);
                     idx += 1;
                     entry = draw.participants.iterateNext(entry);
                 }
 
                 // Mix addresses hash + current seed + current time to derive entropy.
-                val addrHash = addrBuilder.endCell().hash();
+                var addrHash = addrChain.hash();
+                if (!hasAddr) {
+                    addrHash = beginCell().endCell().hash();
+                }
                 val entropyCell = beginCell().storeUint(addrHash, 256).storeUint(
                     random.getSeed(),
                     256

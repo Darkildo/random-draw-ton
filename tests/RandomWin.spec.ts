@@ -1,4 +1,4 @@
-import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
+import { Blockchain, SandboxContract, TreasuryContract, SendMessageResult } from '@ton/sandbox';
 import { Cell, Dictionary, beginCell, toNano } from '@ton/core';
 import { RandomWin } from '../wrappers/RandomWin';
 import '@ton/test-utils';
@@ -464,6 +464,67 @@ describe('RandomWin (random_win.tolk)', () => {
             expect(after!.entryAmountLimit).toBe(before!.entryAmountLimit);
             expect(after!.poolSum).toBe(before!.poolSum);
             expect(after!.participants.size).toBe(before!.participants.size);
+        });
+    });
+
+    describe('Many participants', () => {
+        const participantCounts = [10, 50, 100];
+
+        participantCounts.forEach((count) => {
+            it(`handles draw with ${count} participants and logs fee delta`, async () => {
+                const drawId = 1000 + count;
+                const minEntryAmount = toNano('1');
+                // slightly less than total contributions to ensure payout triggers
+                const entryLimit = minEntryAmount * BigInt(count) - 1n;
+                const createValue = toNano('0.5');
+
+                await randomWin.sendCreateDraw(deployer.getSender(), {
+                    queryId: 1n,
+                    drawId,
+                    minEntryAmount,
+                    entryLimit,
+                    value: createValue,
+                });
+
+                const participants: string[] = [];
+                const startBalance = (await blockchain.getContract(randomWin.address)).balance;
+                const totalIncome = minEntryAmount * BigInt(count);
+
+                let result: SendMessageResult | undefined;
+                for (let i = 0; i < count; i++) {
+                    const roller = await blockchain.treasury(`roller-${count}-${i}`);
+                    participants.push(roller.address.toString());
+                    result = await randomWin.sendLuckRoll(roller.getSender(), {
+                        queryId: BigInt(i + 2),
+                        drawId,
+                        value: minEntryAmount,
+                    });
+                    expect(result.transactions).toHaveTransaction({
+                        from: roller.address,
+                        to: randomWin.address,
+                        success: true,
+                    });
+                }
+
+                expect(result!.transactions).toHaveTransaction({
+                    from: randomWin.address,
+                    to: (addr) => addr !== undefined && participants.includes(addr.toString()),
+                    success: true,
+                });
+
+                const endBalance = (await blockchain.getContract(randomWin.address)).balance;
+                const delta = endBalance - startBalance; // end-start
+                const poolSum = createValue + totalIncome;
+                const payout = (poolSum * 99n) / 100n;
+                const netAfterIncome = endBalance - startBalance - totalIncome; // effect after subtracting all incoming bets
+                const gasDelta = netAfterIncome + payout; // how much we lost to gas vs ideal (-payout)
+                console.log(
+                    `participants=${count} | start=${startBalance} end=${endBalance} delta(end-start)=${delta} nanoton | totalIncome=${totalIncome} payout=${payout} netAfterIncome=${netAfterIncome} gas delta=${gasDelta}`
+                );
+
+                const drawAfter = await randomWin.getDraw(drawId);
+                expect(drawAfter).toBeNull();
+            });
         });
     });
 
