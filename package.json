@@ -1,0 +1,31 @@
+{
+    "name": "random-win",
+    "version": "0.0.1",
+    "scripts": {
+        "bp": "blueprint",
+        "start": "blueprint run",
+        "build": "blueprint build",
+        "test": "jest --verbose",
+        "release": "blueprint pack && npm publish --access public"
+    },
+    "dependencies": {
+        "@ton/core": "~0"
+    },
+    "devDependencies": {
+        "@ton/blueprint": ">=0.41.0",
+        "@ton/sandbox": ">=0.39.0",
+        "@ton/test-utils": ">=0.12.0",
+        "@types/jest": "^30.0.0",
+        "@types/node": "^24.10.1",
+        "jest": "^30.2.0",
+        "prettier": "^3.6.2",
+        "@ton/ton": "^16.0.0",
+        "@ton/crypto": "^3.3.0",
+        "ts-jest": "^29.4.5",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.9.3",
+        "@ton/tolk-js": ">=1.2.0",
+        "@tact-lang/compiler": ">=1.6.13 <2.0.0",
+        "@ton-community/func-js": ">=0.11.0"
+    }
+}
