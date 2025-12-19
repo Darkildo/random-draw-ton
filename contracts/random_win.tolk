@@ -125,7 +125,7 @@ fun onInternalMessage(in: InMessage) {
             storage.save();
         }
         UpdateContractData => {
-            if (in.sender != storage.owner) {
+            if (in.senderAddress != storage.owner) {
                 throw ERROR_NOT_OWNER;
             }
             if (msg.fee != null) {

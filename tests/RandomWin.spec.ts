@@ -8,6 +8,7 @@ describe('RandomWin (random_win.tolk)', () => {
     let code: Cell;
     const feePercent = 1;
     const minCoinsToDraw = toNano('1');
+    const updateContractDataOp = 0x243f6a88;
 
     beforeAll(async () => {
         code = await compile('RandomWin');
@@ -41,6 +42,27 @@ describe('RandomWin (random_win.tolk)', () => {
             success: true,
         });
     });
+
+    const sendUpdateContractData = async (
+        sender: SandboxContract<TreasuryContract>,
+        opts: {
+            queryId?: bigint;
+            fee?: number;
+            minCoinsToDraw?: bigint;
+            value?: bigint;
+        }
+    ) => {
+        return sender.send({
+            to: randomWin.address,
+            value: opts.value ?? toNano('0.05'),
+            body: beginCell()
+                .storeUint(updateContractDataOp, 32)
+                .storeUint(opts.queryId ?? 0n, 64)
+                .storeMaybeUint(opts.fee, 16)
+                .storeMaybeCoins(opts.minCoinsToDraw)
+                .endCell(),
+        });
+    };
 
     it('returns owner and empty storage after deploy', async () => {
         const owner = await randomWin.getOwner();
@@ -137,6 +159,63 @@ describe('RandomWin (random_win.tolk)', () => {
         });
     });
 
+    describe('UpdateContractData', () => {
+        it('updates fee and minCoinsToDraw for owner', async () => {
+            const newFee = 5;
+            const newMinCoinsToDraw = toNano('2');
+
+            const result = await sendUpdateContractData(deployer, {
+                queryId: 1n,
+                fee: newFee,
+                minCoinsToDraw: newMinCoinsToDraw,
+            });
+
+            expect(result.transactions).toHaveTransaction({
+                from: deployer.address,
+                to: randomWin.address,
+                success: true,
+            });
+
+            const storage = await randomWin.getStorage();
+            expect(storage.fee).toBe(newFee);
+            expect(storage.minCoinsToDraw).toBe(newMinCoinsToDraw);
+            expect(storage.drawMap.size).toBe(0);
+        });
+
+        it('updates only provided fields', async () => {
+            const newMinCoinsToDraw = toNano('3');
+
+            await sendUpdateContractData(deployer, {
+                queryId: 2n,
+                minCoinsToDraw: newMinCoinsToDraw,
+            });
+
+            const storage = await randomWin.getStorage();
+            expect(storage.fee).toBe(feePercent);
+            expect(storage.minCoinsToDraw).toBe(newMinCoinsToDraw);
+        });
+
+        it('rejects update from non-owner', async () => {
+            const attacker = await blockchain.treasury('attacker');
+
+            const result = await sendUpdateContractData(attacker, {
+                queryId: 3n,
+                fee: 10,
+                minCoinsToDraw: toNano('2'),
+            });
+
+            expect(result.transactions).toHaveTransaction({
+                from: attacker.address,
+                to: randomWin.address,
+                success: false,
+            });
+
+            const storage = await randomWin.getStorage();
+            expect(storage.fee).toBe(feePercent);
+            expect(storage.minCoinsToDraw).toBe(minCoinsToDraw);
+        });
+    });
+
     describe('LuckRoll', () => {
         it('fails when draw not found', async () => {
             const roller = await blockchain.treasury('roller');
@@ -225,6 +304,49 @@ describe('RandomWin (random_win.tolk)', () => {
             expect(draw!.participants.get(roller.address)).toBe(rollValue);
             expect(draw!.participantCounter).toBe(1);
             expect(draw!.poolSum).toBeGreaterThanOrEqual(createValue + minEntryAmount);
+        });
+
+        it('pays out even when payout is below minEntryAmount', async () => {
+            const updatedFee = 90;
+            await sendUpdateContractData(deployer, {
+                queryId: 10n,
+                fee: updatedFee,
+            });
+
+            const drawId = 1;
+            const createValue = toNano('0.1');
+            const minEntryAmount = toNano('1');
+            const entryLimit = toNano('1');
+
+            await randomWin.sendCreateDraw(deployer.getSender(), {
+                queryId: 11n,
+                drawId,
+                minEntryAmount,
+                entryLimit,
+                value: createValue,
+            });
+
+            const roller = await blockchain.treasury('roller');
+            const rollValue = minEntryAmount + toNano('0.1');
+            const result = await randomWin.sendLuckRoll(roller.getSender(), {
+                queryId: 12n,
+                drawId,
+                value: rollValue,
+            });
+
+            const poolSumUpper = createValue + rollValue;
+            const expectedPayout = (poolSumUpper * BigInt(100 - updatedFee)) / 100n;
+            expect(expectedPayout).toBeLessThan(minEntryAmount);
+
+            expect(result.transactions).toHaveTransaction({
+                from: randomWin.address,
+                to: roller.address,
+                success: true,
+                value: (v) => v !== undefined && v > 0n && v < minEntryAmount,
+            });
+
+            const drawAfter = await randomWin.getDraw(drawId);
+            expect(drawAfter).toBeNull();
         });
 
         it('adds participant and increases poolSum', async () => {
