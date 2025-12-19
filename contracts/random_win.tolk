@@ -109,6 +109,10 @@ fun onInternalMessage(in: InMessage) {
             if (drawResult.isFound) {
                 throw ERROR_DRAW_ALREADY_EXISTS;
             }
+            if (msg.minEntryAmount < storage.minCoinsToDraw) {
+                throw ERROR_MIN_LIMIT_TO_DRAW;
+            }
+
             var draw = Draw {
                 minEntryAmount: msg.minEntryAmount,
                 entryAmountLimit: msg.entryLimit,

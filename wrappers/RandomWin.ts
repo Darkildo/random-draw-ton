@@ -23,12 +23,14 @@ export type RandomWinConfig = {
     owner: Address;
     fee: number; // percent: [0..100]
     drawMap: Dictionary<number, Draw>;
+    minCoinsToDraw: bigint;
 };
 
 export type RandomWinStorage = {
     owner: Address;
     fee: number;
     drawMap: Dictionary<number, Draw>;
+    minCoinsToDraw: bigint;
 };
 
 const CoinsValue: DictionaryValue<bigint> = {
@@ -66,6 +68,7 @@ export function randomWinConfigToCell(config: RandomWinConfig): Cell {
         .storeAddress(config.owner)
         .storeUint(config.fee, 16)
         .storeDict(config.drawMap, Dictionary.Keys.Uint(32), DrawValue)
+        .storeCoins(config.minCoinsToDraw)
         .endCell();
 }
 
@@ -74,8 +77,9 @@ export function randomWinStorageFromCell(data: Cell): RandomWinStorage {
     const owner = slice.loadAddress();
     const fee = Number(slice.loadUint(16));
     const drawMap = Dictionary.load(Dictionary.Keys.Uint(32), DrawValue, slice);
+    const minCoinsToDraw = slice.loadCoins();
     slice.endParse();
-    return { owner, fee, drawMap };
+    return { owner, fee, drawMap, minCoinsToDraw };
 }
 
 export const Opcodes = {

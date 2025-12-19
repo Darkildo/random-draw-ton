@@ -11,6 +11,7 @@ export async function run(provider: NetworkProvider) {
                 owner: adminWallet,
                 fee: 0,
                 drawMap: Dictionary.empty(),
+                minCoinsToDraw: toNano('1'),
             },
             await compile('RandomWin')
         )

@@ -4,6 +4,7 @@ struct Storage {
     owner: address
     fee: uint16
     drawMap: map<uint32, Draw>
+    minCoinsToDraw: coins
 }
 
 fun Storage.load() {

@@ -7,6 +7,7 @@ import { compile } from '@ton/blueprint';
 describe('RandomWin (random_win.tolk)', () => {
     let code: Cell;
     const feePercent = 1;
+    const minCoinsToDraw = toNano('1');
 
     beforeAll(async () => {
         code = await compile('RandomWin');
@@ -26,6 +27,7 @@ describe('RandomWin (random_win.tolk)', () => {
                     owner: deployer.address,
                     fee: feePercent,
                     drawMap: Dictionary.empty(),
+                    minCoinsToDraw,
                 },
                 code
             )
@@ -48,6 +50,7 @@ describe('RandomWin (random_win.tolk)', () => {
         expect(storage.owner.equals(deployer.address)).toBe(true);
         expect(storage.fee).toBe(feePercent);
         expect(storage.drawMap.size).toBe(0);
+        expect(storage.minCoinsToDraw).toBe(minCoinsToDraw);
     });
 
     describe('CreateDraw', () => {
