@@ -3,7 +3,7 @@ import "messages"
 import "models"
 import "storage"
 
-type AllowedMessage = LuckRoll | CreateDraw | TopUpTons
+type AllowedMessage = LuckRoll | CreateDraw | TopUpTons | UpdateContractData
 
 fun onInternalMessage(in: InMessage) {
     if (in.body.isEmpty()) {
@@ -122,6 +122,18 @@ fun onInternalMessage(in: InMessage) {
 
             storage.drawMap.set(msg.drawId, draw);
 
+            storage.save();
+        }
+        UpdateContractData => {
+            if (in.sender != storage.owner) {
+                throw ERROR_NOT_OWNER;
+            }
+            if (msg.fee != null) {
+                storage.fee = msg.fee;
+            }
+            if (msg.minCoinsToDraw != null) {
+                storage.minCoinsToDraw = msg.minCoinsToDraw;
+            }
             storage.save();
         }
         TopUpTons => {

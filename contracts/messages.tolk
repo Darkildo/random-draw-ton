@@ -11,3 +11,10 @@ struct (0x7e8764ef) CreateDraw {
 }
 
 struct (0xd372158c) TopUpTons {}
+
+
+struct (0x243f6a88) UpdateContractData { 
+    queryId: uint64
+    fee: uint16?
+    minCoinsToDraw: coins?
+}
