@@ -6,7 +6,7 @@ import { compile } from '@ton/blueprint';
 
 describe('RandomWin (random_win.tolk)', () => {
     let code: Cell;
-    const feePercent = 1;
+    const feePercent = 2; // min value to positive income after draw + gas fee
     const minCoinsToDraw = toNano('1');
     const updateContractDataOp = 0x243f6a88;
 
